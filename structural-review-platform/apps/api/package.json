@@ -1,0 +1,32 @@
+{
+  "name": "@structural-review-platform/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "latest",
+    "bcryptjs": "latest",
+    "cors": "latest",
+    "express": "latest",
+    "jsonwebtoken": "latest",
+    "multer": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "latest",
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "@types/jsonwebtoken": "latest",
+    "@types/multer": "latest",
+    "@types/node": "latest",
+    "prisma": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

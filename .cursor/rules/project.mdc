@@ -1,0 +1,18 @@
+---
+description: KBase structural review workspace rules
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# KBase Workspace Rules
+
+- Treat `E:\CURSOR0\cursor\KBase` as the engineering workspace root.
+- Keep the project split clear:
+  - `.cursor/skills/structural-project-review/` is the Cursor skill rule source.
+  - `structural-review-agent/` is the runnable M0-M9 TypeScript review agent.
+  - `structural-review-platform/` is the React + Express platform.
+- Do not claim CAD interference checks, strength simulation, mold-flow analysis, ECO approval, test closure, or mass-production release unless source materials explicitly prove them.
+- Preserve evidence and confidence labels in review output: explicit statement, context inference, visual suspicion, and unknown/manual confirmation.
+- Generated reports, uploaded engineering files, local SQLite databases, and Prisma generated clients are runtime artifacts unless the user explicitly asks to version them.
+- On Windows PowerShell, prefer `npm.cmd` when running npm scripts if `npm.ps1` is blocked by execution policy.

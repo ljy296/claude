@@ -1,0 +1,21 @@
+{
+  "name": "kbase-structural-review",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workspace root for the structural review agent, Cursor skill, and web platform.",
+  "scripts": {
+    "install:all": "npm.cmd --prefix structural-review-agent install && npm.cmd --prefix structural-review-platform install",
+    "agent:dev": "npm.cmd --prefix structural-review-agent run dev",
+    "agent:test": "npm.cmd --prefix structural-review-agent test",
+    "agent:typecheck": "npm.cmd --prefix structural-review-agent run typecheck",
+    "platform:dev:api": "npm.cmd --prefix structural-review-platform run dev:api",
+    "platform:dev:web": "npm.cmd --prefix structural-review-platform run dev:web",
+    "platform:typecheck": "npm.cmd --prefix structural-review-platform run typecheck",
+    "platform:build:web": "npm.cmd --prefix structural-review-platform run build:web",
+    "typecheck": "npm.cmd --prefix structural-review-agent run typecheck && npm.cmd --prefix structural-review-platform run typecheck",
+    "test": "npm.cmd --prefix structural-review-agent test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
