@@ -2,6 +2,43 @@ import type { FolderStatus, MaterialDeleteAction, MaterialObjectType, ModuleStat
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:3001";
 
+const TOKEN_STORAGE_KEY = "kbase_token";
+
+/** 当前登录用户 */
+export type AuthUser = {
+  id: string;
+  username: string;
+  displayName: string;
+  role: "admin" | "reviewer";
+};
+
+/** 会话失效（未登录或 token 过期）时抛出的特定错误，供上层切换到登录态 */
+export class UnauthorizedError extends Error {
+  constructor(message = "未授权，请重新登录") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+/** 当会话被判定失效时触发的回调（由 App 注册，用于跳回登录页） */
+let onUnauthorized: (() => void) | undefined;
+
+export function setUnauthorizedHandler(handler: (() => void) | undefined) {
+  onUnauthorized = handler;
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setToken(token: string) {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
 export type Project = {
   id: string;
   name: string;
@@ -403,14 +440,103 @@ function getRelativePath(file: File): string {
   return (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
 }
 
+/** 用户登录，成功后持久化 token */
+export async function login(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
+  const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(error.message ?? (response.status === 401 ? "用户名或密码错误" : response.statusText));
+  }
+  const data = (await response.json()) as { token: string; user: AuthUser };
+  setToken(data.token);
+  return data;
+}
+
+/** 使用当前 token 校验会话并获取当前用户 */
+export async function fetchMe(): Promise<AuthUser> {
+  const data = await request<{ user: AuthUser }>("/api/auth/me");
+  return data.user;
+}
+
+/** 退出登录，清除本地 token */
+export function logout() {
+  clearToken();
+}
+
+/**
+ * 安全下载资料对象文件：带 Bearer token 用 fetch 取回 blob，
+ * 再通过 URL.createObjectURL 触发浏览器下载（避免在 <a href> 中暴露 token）。
+ */
+export async function downloadMaterial(projectId: string, materialId: string, versionId?: string): Promise<void> {
+  const query = versionId ? `?versionId=${encodeURIComponent(versionId)}` : "";
+  const token = getToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const response = await fetch(
+    `${apiBaseUrl}/api/projects/${projectId}/materials/${materialId}/download${query}`,
+    { headers },
+  );
+
+  if (response.status === 401) {
+    clearToken();
+    onUnauthorized?.();
+    throw new UnauthorizedError();
+  }
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(message || response.statusText);
+  }
+
+  const blob = await response.blob();
+  const fileName = parseFileName(response.headers.get("Content-Disposition")) ?? "download";
+
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+/** 从 Content-Disposition 头解析文件名，支持 RFC 5987 的 filename* */
+function parseFileName(disposition: string | null): string | undefined {
+  if (!disposition) return undefined;
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return asciiMatch ? asciiMatch[1] : undefined;
+}
+
 async function request<T>(path: string, init: RequestInit & { json?: boolean } = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.json !== false) headers.set("Content-Type", "application/json");
+
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers,
   });
+
+  if (response.status === 401) {
+    clearToken();
+    onUnauthorized?.();
+    throw new UnauthorizedError();
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: response.statusText }));

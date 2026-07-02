@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import {
   createReview,
   deleteMaterial,
+  downloadMaterial,
   getFolder,
   confirmModule,
   interpretModule,
@@ -74,6 +75,15 @@ export function FolderPage({ project, folderCode, onBackToProject, onOpenMateria
   async function handleDelete(materialId: string, action: MaterialDeleteAction) {
     await deleteMaterial(materialId, action);
     await refresh();
+  }
+
+  async function handleDownload(materialId: string) {
+    setError(undefined);
+    try {
+      await downloadMaterial(project.id, materialId);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : String(downloadError));
+    }
   }
 
   async function handleReview() {
@@ -254,6 +264,15 @@ export function FolderPage({ project, folderCode, onBackToProject, onOpenMateria
                 >
                   查看详情
                 </button>
+                {material.sizeBytes ? (
+                  <button
+                    className="view-btn"
+                    onClick={() => void handleDownload(material.id)}
+                    type="button"
+                  >
+                    下载
+                  </button>
+                ) : null}
                 {materialDeleteActions.map((action) => (
                   <button
                     className={action === "彻底删除" ? "danger-button" : undefined}

@@ -16,6 +16,7 @@ coverage/
 # Generated review output and local platform data
 structural-review-agent/reports/
 structural-review-platform/storage/
+structural-review-platform/apps/api/storage/
 structural-review-platform/apps/api/prisma/*.db
 structural-review-platform/apps/api/prisma/*.db-journal
 structural-review-platform/apps/api/prisma/*.db-shm

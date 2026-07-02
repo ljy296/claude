@@ -24,6 +24,14 @@ npm.cmd run typecheck
 npm.cmd run test
 ```
 
+Set up the platform database (SQLite via Prisma) once before first run:
+
+```powershell
+copy structural-review-platform\apps\api\.env.example structural-review-platform\apps\api\.env  # 若尚无 .env（参考根目录 .env.example）
+npm.cmd --prefix structural-review-platform/apps/api run prisma:generate
+npm.cmd --prefix structural-review-platform/apps/api run prisma:push
+```
+
 Run the web platform in two terminals:
 
 ```powershell
@@ -31,10 +39,11 @@ npm.cmd run platform:dev:api
 npm.cmd run platform:dev:web
 ```
 
-Default URLs:
+Default URLs and login:
 
 - API: `http://127.0.0.1:3001`
 - Web: `http://127.0.0.1:5173`
+- 首次启动 API 会自动创建默认管理员（`admin` / `admin12345`，见 `.env` 的 `SEED_ADMIN_*`）。登录后请尽快修改密码相关配置。所有 `/api/*` 接口（除 `/api/health` 与 `/api/auth/login`）均需登录后携带 `Authorization: Bearer <token>`。
 
 Run the agent directly:
 
@@ -45,8 +54,9 @@ npm.cmd run agent:dev -- "E:\path\to\project-package" "完整审查" --out repor
 ## Verification
 
 - Agent: `npm.cmd run agent:typecheck`, `npm.cmd run agent:test`
-- Platform: `npm.cmd run platform:typecheck`, `npm.cmd run platform:build:web`
+- Platform: `npm.cmd run platform:typecheck`, `npm.cmd run platform:build:web`, `npm.cmd run platform:test`
 - All TypeScript checks from root: `npm.cmd run typecheck`
+- All tests from root (agent + platform API): `npm.cmd run test`
 
 ## Runtime Data
 

@@ -8,6 +8,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 平台用户：支持登录鉴权与角色权限（admin / reviewer）。
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  role         String   @default("reviewer")
+  disabledAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Project {
   id          String          @id @default(cuid())
   name        String
@@ -17,88 +29,143 @@ model Project {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   folders     ProjectFolder[]
-  jobs        ReviewJob[]
+  materials   MaterialObject[]
   reports     ReviewReport[]
+  jobs        ReviewJob[]
   auditLogs   AuditLog[]
 }
 
 model ProjectFolder {
-  id        String           @id @default(cuid())
-  projectId String
-  code      String
-  name      String
-  status    String           @default("未上传")
-  sortOrder Int
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  project   Project          @relation(fields: [projectId], references: [id])
-  materials MaterialObject[]
-  jobs      ReviewJob[]
-  reports   ReviewReport[]
+  id          String   @id @default(cuid())
+  projectId   String
+  code        String
+  name        String
+  description String
+  status      String   @default("未上传")
+  sortOrder   Int
+  reportCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, code])
 }
 
 model MaterialObject {
-  id              String         @id @default(cuid())
-  projectFolderId String
-  type            String
-  name            String
-  originalName    String?
-  storagePath     String?
-  sizeBytes       Int?
-  mimeType        String?
-  deletedAt       DateTime?
+  id                   String    @id @default(cuid())
+  projectId            String
+  folderCode           String
+  // 关联模块编码列表，JSON 字符串数组
+  moduleCodes          String    @default("[]")
+  type                 String
+  name                 String
+  originalName         String?
+  storagePath          String?
+  sizeBytes            Int?
+  mimeType             String?
+  deletedAt            DateTime?
   permanentlyDeletedAt DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  folder          ProjectFolder  @relation(fields: [projectFolderId], references: [id])
-  reviewLinks     ReviewMaterial[]
+  createdAt            DateTime  @default(now())
+  effectiveVersion     String?
+  activeVersionId      String?
+  metadata             String?
+  project              Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions             MaterialVersion[]
+}
+
+model MaterialVersion {
+  id          String   @id @default(cuid())
+  materialId  String
+  projectId   String
+  versionTag  String
+  name        String
+  storagePath String?
+  sizeBytes   Int?
+  mimeType    String?
+  uploadedAt  DateTime @default(now())
+  uploadedBy  String?
+  note        String?
+  material    MaterialObject @relation(fields: [materialId], references: [id], onDelete: Cascade)
 }
 
 model ReviewJob {
-  id              String           @id @default(cuid())
-  projectId       String
-  projectFolderId String?
-  reviewType      String
-  status          String           @default("pending")
-  errorMessage    String?
-  startedAt       DateTime?
-  finishedAt      DateTime?
-  createdAt       DateTime         @default(now())
-  project         Project          @relation(fields: [projectId], references: [id])
-  folder          ProjectFolder?   @relation(fields: [projectFolderId], references: [id])
-  materials       ReviewMaterial[]
-  reports         ReviewReport[]
-}
-
-model ReviewMaterial {
-  id               String         @id @default(cuid())
-  reviewJobId      String
-  materialObjectId String
-  removedAt        DateTime?
-  removeReason     String?
-  reviewJob        ReviewJob      @relation(fields: [reviewJobId], references: [id])
-  materialObject   MaterialObject @relation(fields: [materialObjectId], references: [id])
-
-  @@unique([reviewJobId, materialObjectId])
+  id             String   @id @default(cuid())
+  projectId      String
+  folderCode     String?
+  reviewType     String
+  status         String   @default("pending")
+  reportBaseName String
+  createdAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model ReviewReport {
-  id              String         @id @default(cuid())
+  id              String   @id @default(cuid())
   projectId       String
-  projectFolderId String?
+  folderCode      String?
+  moduleCode      String?
   reviewJobId     String
   baseName        String
-  markdownPath    String?
-  excelPath       String?
-  wordPath        String?
-  pdfPath         String?
-  markdownContent String?
-  createdAt       DateTime       @default(now())
-  project         Project        @relation(fields: [projectId], references: [id])
-  folder          ProjectFolder? @relation(fields: [projectFolderId], references: [id])
-  reviewJob       ReviewJob      @relation(fields: [reviewJobId], references: [id])
+  title           String
+  markdownContent String
+  createdAt       DateTime @default(now())
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ModuleInterpretation {
+  id               String    @id @default(cuid())
+  projectId        String
+  folderCode       String
+  moduleCode       String
+  moduleName       String
+  status           String
+  materialStatus   String
+  sourceType       String
+  coreSummary      String
+  structuralJudgment String
+  confidence       String
+  blocksStage      Boolean   @default(false)
+  // 以下均为 JSON 字符串
+  recognizedMaterials String @default("[]")
+  risks               String @default("[]")
+  missingItems        String @default("[]")
+  evidenceChain       String @default("[]")
+  admissionResult     String @default("{}")
+  confirmationQuestions String @default("[]")
+  suggestedActions    String @default("[]")
+  createdAt        DateTime  @default(now())
+  confirmedAt      DateTime?
+}
+
+model BomCheckResult {
+  id                 String   @id @default(cuid())
+  projectId          String
+  folderCode         String
+  checkedPrefix      String
+  usedSheet          String
+  sheetIsAutoDetected Boolean @default(false)
+  // JSON 字符串字段
+  bomOnlyItems       String   @default("[]")
+  drawingOnlyItems   String   @default("[]")
+  fuzzyMatches       String   @default("[]")
+  versionConflicts   String   @default("[]")
+  tripleGaps         String   @default("[]")
+  namingIssues       String   @default("[]")
+  suggestions        String   @default("[]")
+  createdAt          DateTime @default(now())
+}
+
+model AiQa {
+  id             String   @id @default(cuid())
+  scope          String
+  projectId      String?
+  question       String
+  answer         String
+  judgability    String
+  permissionScope String
+  // JSON 字符串
+  evidenceSources String  @default("[]")
+  createdAt      DateTime @default(now())
 }
 
 model AuditLog {
@@ -110,5 +177,5 @@ model AuditLog {
   targetId   String?
   message    String?
   createdAt  DateTime @default(now())
-  project    Project? @relation(fields: [projectId], references: [id])
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 }
