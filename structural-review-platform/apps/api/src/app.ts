@@ -10,7 +10,11 @@ export function createApp() {
   app.use(express.json({ limit: "10mb" }));
 
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", service: "structural-review-platform-api" });
+    res.json({
+      status: "ok",
+      service: "structural-review-platform-api",
+      persistence: platformStore.getPersistenceStatus(),
+    });
   });
 
   app.use("/api/projects", projectRouter);

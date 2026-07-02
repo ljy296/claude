@@ -201,6 +201,21 @@ projectRouter.get("/:projectId/folders/:folderCode/reports", (req, res) => {
   }
 });
 
+projectRouter.get("/:projectId/reports/:reportId/download", (req, res) => {
+  try {
+    const report = platformStore.getReport(singleValue(req.params.reportId));
+    if (!report || report.projectId !== req.params.projectId) {
+      return res.status(404).json({ message: "报告不存在" });
+    }
+    const fileName = sanitizeFileName(`${report.baseName}.md`);
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    return res.send(report.markdownContent);
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 projectRouter.get("/:projectId/folders/:folderCode/missing-hints", (req, res) => {
   try {
     res.json({

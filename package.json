@@ -10,6 +10,8 @@
     "agent:typecheck": "npm.cmd --prefix structural-review-agent run typecheck",
     "platform:dev:api": "npm.cmd --prefix structural-review-platform run dev:api",
     "platform:dev:web": "npm.cmd --prefix structural-review-platform run dev:web",
+    "platform:dev": "powershell -ExecutionPolicy Bypass -File structural-review-platform/scripts/start-dev-windows.ps1",
+    "platform:test": "npm.cmd --prefix structural-review-platform test",
     "platform:typecheck": "npm.cmd --prefix structural-review-platform run typecheck",
     "platform:build:web": "npm.cmd --prefix structural-review-platform run build:web",
     "typecheck": "npm.cmd --prefix structural-review-agent run typecheck && npm.cmd --prefix structural-review-platform run typecheck",

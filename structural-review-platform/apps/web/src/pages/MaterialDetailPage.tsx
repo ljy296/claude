@@ -80,7 +80,7 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
     );
   }
 
-  const { material, versions, reports, auditLogs } = detail;
+  const { material, versions, reports, auditLogs, parseFeedback } = detail;
 
   return (
     <main className="project-detail-page">
@@ -142,6 +142,7 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
       {activeTab === "parse" ? (
         <section className="folder-workspace data-panel">
           <h2>解析结果</h2>
+          <ParseFeedbackCard feedback={parseFeedback} />
           {renderParseResult(material.name, material.mimeType)}
         </section>
       ) : null}
@@ -280,6 +281,34 @@ function AuditLogRow({ log }: { log: AuditLog }) {
       <span className="audit-message">{log.message ?? "—"}</span>
       <span className="audit-time">{log.createdAt}</span>
     </div>
+  );
+}
+
+function ParseFeedbackCard({ feedback }: { feedback: MaterialDetail["parseFeedback"] }) {
+  const statusLabel: Record<typeof feedback.status, string> = {
+    parsed: "已接入解析",
+    needs_manual_review: "需人工复核",
+    unsupported: "暂不支持",
+    not_available: "无实际文件",
+  };
+
+  return (
+    <article className="parse-feedback-card">
+      <div className="module-card-head">
+        <span>{statusLabel[feedback.status]}</span>
+        <strong>置信度：{feedback.confidence}</strong>
+      </div>
+      <p><b>解析器：</b>{feedback.parser}</p>
+      <p>{feedback.summary}</p>
+      <ul>
+        {feedback.findings.map((finding) => (
+          <li key={finding}>{finding}</li>
+        ))}
+      </ul>
+      {feedback.requiresManualConfirmation ? (
+        <p className="preview-hint">该资料的自动解析结果需要结构工程师人工确认后，才能作为正式审查依据。</p>
+      ) : null}
+    </article>
   );
 }
 

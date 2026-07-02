@@ -58,11 +58,21 @@ export type MaterialObject = {
   metadata?: string;
 };
 
+export type MaterialParseFeedback = {
+  status: "parsed" | "needs_manual_review" | "unsupported" | "not_available";
+  confidence: "高" | "中" | "低" | "未知";
+  parser: string;
+  summary: string;
+  findings: string[];
+  requiresManualConfirmation: boolean;
+};
+
 export type MaterialDetail = {
   material: MaterialObject;
   versions: MaterialVersion[];
   reports: ReviewReport[];
   auditLogs: AuditLog[];
+  parseFeedback: MaterialParseFeedback;
 };
 
 export type EvidenceTrace = {
@@ -318,6 +328,10 @@ export async function confirmModule(projectId: string, folderCode: string, modul
 
 export async function listReports(projectId: string, folderCode: string) {
   return request<{ reports: ReviewReport[] }>(`/api/projects/${projectId}/folders/${folderCode}/reports`);
+}
+
+export function reportDownloadUrl(projectId: string, reportId: string): string {
+  return `${apiBaseUrl}/api/projects/${encodeURIComponent(projectId)}/reports/${encodeURIComponent(reportId)}/download`;
 }
 
 export async function getMissingHints(projectId: string, folderCode: string) {

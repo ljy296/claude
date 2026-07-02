@@ -5,6 +5,7 @@ import {
   getFolder,
   confirmModule,
   interpretModule,
+  reportDownloadUrl,
   uploadMaterials,
   type MaterialObject,
   type ModuleInterpretation,
@@ -331,6 +332,9 @@ export function FolderPage({ project, folderCode, onBackToProject, onOpenMateria
               <div>
                 <h3>{report.baseName}</h3>
                 <p>{report.title} · {report.createdAt}</p>
+                <a href={reportDownloadUrl(project.id, report.id)} download>
+                  下载 Markdown 报告
+                </a>
               </div>
               <pre>{report.markdownContent}</pre>
             </article>

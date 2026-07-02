@@ -11,8 +11,13 @@ This project is a local engineering knowledge/review workspace for structural pr
 - A local web platform: `structural-review-platform/`
 - Real engineering uploads/reports under `structural-review-platform/storage/`
 - Original design documents and sample BOM files in the workspace root
+- An initialized Git repository on branch `main`
 
-No `.git` directory was found in the project root, and the `git` CLI is not available in the current shell environment.
+Git metadata is present in the project root. The current repository has an initial commit:
+
+- `36853e784e600be83c149cc6acd92cd98352d497` - `Initialize KBase workspace`
+
+The `git` CLI is still not available in the current shell environment, so repository checks were verified from `.git` metadata.
 
 ## Project Components
 
@@ -140,12 +145,24 @@ Cursor plan files under `C:\Users\lijia\.cursor\plans` contain several historica
 
 Some historical plan and README text appears mojibake in the terminal, but the project code and filenames still make the implementation shape clear.
 
+## Verification Status
+
+Checked on 2026-06-15:
+
+- `npm.cmd run typecheck`: passed for the root workspace, review agent, API, and web app.
+- `npm.cmd run test`: passed for the review agent, 2 test files / 2 tests.
+- `npm.cmd run platform:build:web`: passed; Vite production build completed.
+- API health check: `http://127.0.0.1:3001/api/health` returned `{"status":"ok","service":"structural-review-platform-api"}`.
+- Web app check: `http://127.0.0.1:5173` returned HTTP 200.
+- Prisma schema validation: passed when `DATABASE_URL=file:./dev.db` is provided.
+
 ## Local Environment Notes
 
-- Node is installed: `v24.16.0`.
+- Node is installed: `v24.16.0`; npm is `11.13.0`.
 - PowerShell blocks `npm.ps1`, so use `npm.cmd`.
-- `git` was not found in the shell.
+- `git` was not found in the shell, even though the project already has Git metadata and an initial commit.
 - Both child projects already have `node_modules` and `package-lock.json`.
+- No root `.env` file was found. `.env.example` documents the expected local variables, including `DATABASE_URL`.
 
 ## Initialization Added
 
@@ -159,7 +176,8 @@ The workspace root now has:
 
 ## Suggested Next Steps
 
-1. Install Git CLI if this workspace will be versioned.
+1. Install Git CLI or add it to PATH if you want normal `git status`, commit, branch, and remote commands from this shell.
 2. Decide whether the root BOM/design documents should be versioned or moved to runtime/sample data.
 3. Decide whether platform storage should be backed up separately before any repository cleanup.
-4. Run `npm.cmd run typecheck` and `npm.cmd run test` after any dependency refresh.
+4. Create a local `.env` from `.env.example` if Prisma CLI commands or API scripts need explicit environment variables outside the already running service.
+5. Run `npm.cmd run typecheck` and `npm.cmd run test` after any dependency refresh.

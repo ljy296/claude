@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import {
   buildDefaultProjectFolders,
   buildFolderReportBaseName,
@@ -61,6 +63,15 @@ export type MaterialObjectRecord = {
   activeVersionId?: string;
   /** 资料描述/元数据备注 */
   metadata?: string;
+};
+
+export type MaterialParseFeedback = {
+  status: "parsed" | "needs_manual_review" | "unsupported" | "not_available";
+  confidence: "高" | "中" | "低" | "未知";
+  parser: string;
+  summary: string;
+  findings: string[];
+  requiresManualConfirmation: boolean;
 };
 
 /** 资料对象的一个历史版本记录 */
@@ -236,7 +247,36 @@ const bomCheckResults = new Map<string, BomDrawingCheckResult>();
 const aiQaRecords: AiQaRecord[] = [];
 const auditLogs: AuditLogRecord[] = [];
 
+type StoreSnapshot = {
+  projects?: ProjectRecord[];
+  folders?: [string, ProjectFolderRecord[]][];
+  materials?: MaterialObjectRecord[];
+  materialVersions?: MaterialVersionRecord[];
+  jobs?: ReviewJobRecord[];
+  reports?: ReviewReportRecord[];
+  interpretations?: ModuleInterpretationRecord[];
+  bomCheckResults?: BomDrawingCheckResult[];
+  aiQaRecords?: AiQaRecord[];
+  auditLogs?: AuditLogRecord[];
+};
+
+const storePath = process.env.PLATFORM_STORE_PATH ?? resolve(process.cwd(), "../../storage/platform-store.json");
+
+hydrateStore();
+
 export const platformStore = {
+  getPersistenceStatus() {
+    return {
+      mode: "json-snapshot",
+      path: storePath,
+      exists: existsSync(storePath),
+      projectCount: projects.size,
+      materialCount: materials.size,
+      reportCount: reports.size,
+      auditLogCount: auditLogs.length,
+    };
+  },
+
   listProjects(includeDeleted = false) {
     return [...projects.values()].filter((project) => includeDeleted || !project.deletedAt);
   },
@@ -260,6 +300,7 @@ export const platformStore = {
       reportCount: 0,
     })));
     writeAudit(project.id, "project.create", "Project", project.id, `创建项目 ${project.name}`);
+    persistStore();
     return project;
   },
 
@@ -272,6 +313,7 @@ export const platformStore = {
     const updated = { ...project, ...input, updatedAt: new Date().toISOString() };
     projects.set(projectId, updated);
     writeAudit(projectId, "project.update", "Project", projectId, `更新项目 ${updated.name}`);
+    persistStore();
     return updated;
   },
 
@@ -281,6 +323,7 @@ export const platformStore = {
     const updated = { ...project, deletedAt: deletion.deletedAt.toISOString(), updatedAt: new Date().toISOString() };
     projects.set(projectId, updated);
     writeAudit(projectId, deletion.auditAction, "Project", projectId, `软删除项目，保留 ${deletion.keeps.join("、")}`);
+    persistStore();
     return updated;
   },
 
@@ -289,6 +332,7 @@ export const platformStore = {
     const updated = { ...project, deletedAt: undefined, updatedAt: new Date().toISOString() };
     projects.set(projectId, updated);
     writeAudit(projectId, "project.restore", "Project", projectId, "恢复软删除项目");
+    persistStore();
     return updated;
   },
 
@@ -355,6 +399,7 @@ export const platformStore = {
     materials.set(material.id, material);
     updateFolderStats(projectId, input.folderCode);
     writeAudit(projectId, "material.upload", "MaterialObject", material.id, `上传资料对象 ${material.name}（${versionTag}）`);
+    persistStore();
     return material;
   },
 
@@ -372,6 +417,7 @@ export const platformStore = {
     const updated = { ...material, moduleCodes };
     materials.set(materialId, updated);
     writeAudit(material.projectId, "material.link_module", "MaterialObject", material.id, `资料对象关联模块 ${moduleCode}`);
+    persistStore();
     return updated;
   },
 
@@ -381,6 +427,7 @@ export const platformStore = {
     const updated = { ...material, moduleCodes };
     materials.set(materialId, updated);
     writeAudit(material.projectId, "material.unlink_module", "MaterialObject", material.id, `资料对象取消关联模块 ${moduleCode}`);
+    persistStore();
     return updated;
   },
 
@@ -389,6 +436,7 @@ export const platformStore = {
     const deletion = describeMaterialDeletion(action);
     if (action === "从本次审查移除") {
       writeAudit(material.projectId, "material.remove_from_review", "MaterialObject", material.id, "从本次审查移除资料对象");
+      persistStore();
       return { material, deletion };
     }
 
@@ -399,6 +447,7 @@ export const platformStore = {
     materials.set(materialId, updated);
     updateFolderStats(material.projectId, material.folderCode);
     writeAudit(material.projectId, action === "彻底删除" ? "material.permanent_delete" : "material.soft_delete", "MaterialObject", material.id, action);
+    persistStore();
     return { material: updated, deletion };
   },
 
@@ -408,6 +457,7 @@ export const platformStore = {
     materials.set(materialId, updated);
     updateFolderStats(material.projectId, material.folderCode);
     writeAudit(material.projectId, "material.restore", "MaterialObject", material.id, "从回收站恢复资料对象");
+    persistStore();
     return updated;
   },
 
@@ -450,6 +500,7 @@ export const platformStore = {
     reports.set(report.id, report);
     if (folderCode) setFolderStatus(projectId, folderCode, "已出报告");
     writeAudit(projectId, "review.create", "ReviewJob", job.id, `创建审查任务 ${job.reportBaseName}`);
+    persistStore();
     return job;
   },
 
@@ -458,6 +509,10 @@ export const platformStore = {
       report.projectId === projectId &&
       (!folderCode || report.folderCode === folderCode),
     );
+  },
+
+  getReport(reportId: string) {
+    return reports.get(reportId);
   },
 
   createModuleInterpretation(projectId: string, folderCode: string, moduleCode: string, reviewType = "模块深度解读") {
@@ -523,6 +578,7 @@ export const platformStore = {
     };
     reports.set(report.id, report);
     writeAudit(projectId, "module.interpret", "ReviewModule", moduleCode, `生成模块解读 ${reportBaseName}`);
+    persistStore();
     return { interpretation, report };
   },
 
@@ -532,6 +588,7 @@ export const platformStore = {
     const updated = { ...latest, status: "人工已确认" as const, confirmedAt: new Date().toISOString(), blocksStage: false };
     interpretations.set(latest.id, updated);
     writeAudit(projectId, "module.confirm", "ReviewModule", moduleCode, "人工确认模块解读结果");
+    persistStore();
     return updated;
   },
 
@@ -598,7 +655,13 @@ export const platformStore = {
       ) && report.projectId === material.projectId,
     );
     const materialAuditLogs = auditLogs.filter((log) => log.targetId === material.id);
-    return { material, versions, reports: materialReports, auditLogs: materialAuditLogs };
+    return {
+      material,
+      versions,
+      reports: materialReports,
+      auditLogs: materialAuditLogs,
+      parseFeedback: buildMaterialParseFeedback(material),
+    };
   },
 
   addMaterialVersion(materialId: string, input: {
@@ -633,6 +696,7 @@ export const platformStore = {
     };
     materials.set(materialId, updated);
     writeAudit(material.projectId, "material.replace_version", "MaterialObject", material.id, `上传新版本 ${newTag}：${input.name}`);
+    persistStore();
     return { material: updated, version };
   },
 
@@ -651,6 +715,7 @@ export const platformStore = {
     };
     materials.set(materialId, updated);
     writeAudit(material.projectId, "material.set_effective_version", "MaterialObject", material.id, `设置有效版本为 ${version.versionTag}`);
+    persistStore();
     return { material: updated, version };
   },
 
@@ -659,6 +724,7 @@ export const platformStore = {
     const updated = { ...material, ...input };
     materials.set(materialId, updated);
     writeAudit(material.projectId, "material.modify_metadata", "MaterialObject", material.id, `修改元数据: ${JSON.stringify(input)}`);
+    persistStore();
     return updated;
   },
 
@@ -672,6 +738,7 @@ export const platformStore = {
     const result = runBomDrawingCheckLogic(projectId, folderCode, folderMaterials);
     bomCheckResults.set(result.id, result);
     writeAudit(projectId, "module.interpret", "BomCheck", result.id, `BOM/图纸专项检查: ${result.checkedPrefix}`);
+    persistStore();
     return result;
   },
 
@@ -692,6 +759,7 @@ export const platformStore = {
     if (input.projectId) {
       writeAudit(input.projectId, "ai_qa.reference", "AiQa", qa.id, `AI问答: ${input.question.slice(0, 60)}`);
     }
+    persistStore();
     return qa;
   },
 
@@ -755,6 +823,147 @@ function writeAudit(projectId: string | undefined, action: AuditAction, targetTy
     message,
     createdAt: new Date().toISOString(),
   });
+}
+
+function buildMaterialParseFeedback(material: MaterialObjectRecord): MaterialParseFeedback {
+  const ext = material.name.split(".").pop()?.toLowerCase() ?? "";
+  const mimeType = material.mimeType ?? "";
+
+  if (!material.storagePath) {
+    return {
+      status: "not_available",
+      confidence: "未知",
+      parser: "folder-placeholder",
+      summary: "该资料对象未绑定实际文件，当前只能作为文件夹或批量资料占位记录。",
+      findings: ["可关联模块和人工备注", "无法抽取正文、表格或图纸内容"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/xlsx|xls|csv/.test(ext)) {
+    return {
+      status: "parsed",
+      confidence: "中",
+      parser: "spreadsheet-outline",
+      summary: "可作为 BOM、Part list、问题清单或测试台账参与规则检查；内部版优先使用文件名和表格意图识别。",
+      findings: ["建议确认是否包含 2D图纸/3D图纸 列", "建议确认 sheet 名是否匹配 HA1_DE、HA1_CB 等图纸前缀"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/docx|doc/.test(ext)) {
+    return {
+      status: "parsed",
+      confidence: "中",
+      parser: "word-text-outline",
+      summary: "可作为需求、方案、评审记录、ECO 或测试说明参与模块解读；结论仍需人工确认。",
+      findings: ["可抽取正文关键词", "适合用于缺失项、风险点和证据链提示"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/pdf/.test(ext) || mimeType.includes("pdf")) {
+    return {
+      status: "needs_manual_review",
+      confidence: "低",
+      parser: "pdf-text-outline",
+      summary: "PDF 可参与文本抽取，但扫描件、图片型 PDF 和图纸 PDF 需要人工复核。",
+      findings: ["建议确认 PDF 是否为可复制文本", "扫描图纸或签核页不能直接作为自动结论依据"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/pptx|ppt/.test(ext)) {
+    return {
+      status: "parsed",
+      confidence: "中",
+      parser: "slide-text-outline",
+      summary: "可作为方案、DFM、阶段评审或汇报材料参与文本线索提取。",
+      findings: ["建议人工确认关键结论页", "图片中的尺寸或批注需要人工复核"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/png|jpg|jpeg|webp|bmp/.test(ext) || mimeType.startsWith("image/")) {
+    return {
+      status: "needs_manual_review",
+      confidence: "低",
+      parser: "image-ocr-outline",
+      summary: "图片类资料可尝试 OCR，但不得直接形成 CAD、尺寸、公差或签核结论。",
+      findings: ["图片清晰度会显著影响识别", "视觉判断必须标记为低置信度或需人工确认"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/stp|step|sldprt|prt|iges|igs|dwg|dxf/.test(ext)) {
+    return {
+      status: "needs_manual_review",
+      confidence: "未知",
+      parser: "cad-metadata-only",
+      summary: "CAD/3D 文件当前仅记录名称、版本和关联关系，不能自动读取几何、尺寸、公差或干涉结论。",
+      findings: ["可用于 BOM/图纸命名对应检查", "几何和结构判断必须由工程师或专业工具确认"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  if (/zip|rar|7z/.test(ext)) {
+    return {
+      status: "needs_manual_review",
+      confidence: "未知",
+      parser: "archive-placeholder",
+      summary: "压缩包当前作为批量资料容器记录，建议解压后上传关键文件以获得更明确的模块解读。",
+      findings: ["无法直接确认包内文件完整性", "建议补充包内清单或单独上传 BOM/图纸/报告"],
+      requiresManualConfirmation: true,
+    };
+  }
+
+  return {
+    status: "unsupported",
+    confidence: "未知",
+    parser: "unsupported",
+    summary: "当前文件格式尚未接入解析规则，只能用于人工归档和备注。",
+    findings: ["建议补充可解析格式的配套资料", "审查结论不得依赖该文件的未解析内容"],
+    requiresManualConfirmation: true,
+  };
+}
+
+function hydrateStore() {
+  if (!existsSync(storePath)) return;
+
+  try {
+    const snapshot = JSON.parse(readFileSync(storePath, "utf8")) as StoreSnapshot;
+    for (const project of snapshot.projects ?? []) projects.set(project.id, project);
+    for (const [projectId, projectFolders] of snapshot.folders ?? []) folders.set(projectId, projectFolders);
+    for (const material of snapshot.materials ?? []) materials.set(material.id, material);
+    for (const version of snapshot.materialVersions ?? []) materialVersions.set(version.id, version);
+    for (const job of snapshot.jobs ?? []) jobs.set(job.id, job);
+    for (const report of snapshot.reports ?? []) reports.set(report.id, report);
+    for (const interpretation of snapshot.interpretations ?? []) interpretations.set(interpretation.id, interpretation);
+    for (const result of snapshot.bomCheckResults ?? []) bomCheckResults.set(result.id, result);
+    aiQaRecords.splice(0, aiQaRecords.length, ...(snapshot.aiQaRecords ?? []));
+    auditLogs.splice(0, auditLogs.length, ...(snapshot.auditLogs ?? []));
+  } catch (error) {
+    console.warn(`Failed to load platform store snapshot at ${storePath}:`, error);
+  }
+}
+
+function persistStore() {
+  const snapshot: StoreSnapshot = {
+    projects: [...projects.values()],
+    folders: [...folders.entries()],
+    materials: [...materials.values()],
+    materialVersions: [...materialVersions.values()],
+    jobs: [...jobs.values()],
+    reports: [...reports.values()],
+    interpretations: [...interpretations.values()],
+    bomCheckResults: [...bomCheckResults.values()],
+    aiQaRecords,
+    auditLogs,
+  };
+  mkdirSync(dirname(storePath), { recursive: true });
+  const tmpPath = `${storePath}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(snapshot, null, 2), "utf8");
+  renameSync(tmpPath, storePath);
 }
 
 function createId(prefix: string) {
