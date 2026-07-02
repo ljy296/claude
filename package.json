@@ -12,8 +12,9 @@
     "platform:dev:web": "npm.cmd --prefix structural-review-platform run dev:web",
     "platform:typecheck": "npm.cmd --prefix structural-review-platform run typecheck",
     "platform:build:web": "npm.cmd --prefix structural-review-platform run build:web",
+    "platform:test": "npm.cmd --prefix structural-review-platform/apps/api test",
     "typecheck": "npm.cmd --prefix structural-review-agent run typecheck && npm.cmd --prefix structural-review-platform run typecheck",
-    "test": "npm.cmd --prefix structural-review-agent test"
+    "test": "npm.cmd --prefix structural-review-agent test && npm.cmd --prefix structural-review-platform/apps/api test"
   },
   "engines": {
     "node": ">=22"

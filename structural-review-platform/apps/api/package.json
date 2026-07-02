@@ -6,27 +6,32 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
-    "prisma:generate": "prisma generate"
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "latest",
-    "bcryptjs": "latest",
-    "cors": "latest",
-    "express": "latest",
-    "jsonwebtoken": "latest",
-    "multer": "latest",
-    "zod": "latest"
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "3.0.3",
+    "cors": "2.8.6",
+    "exceljs": "4.4.0",
+    "express": "5.2.1",
+    "jsonwebtoken": "9.0.3",
+    "multer": "2.1.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/bcryptjs": "latest",
-    "@types/cors": "latest",
-    "@types/express": "latest",
-    "@types/jsonwebtoken": "latest",
-    "@types/multer": "latest",
-    "@types/node": "latest",
-    "prisma": "latest",
-    "tsx": "latest",
-    "typescript": "latest",
-    "vitest": "latest"
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.6",
+    "@types/jsonwebtoken": "9.0.10",
+    "@types/multer": "2.1.0",
+    "@types/node": "25.9.1",
+    "@types/supertest": "6.0.3",
+    "prisma": "6.19.3",
+    "supertest": "7.1.1",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
   }
 }

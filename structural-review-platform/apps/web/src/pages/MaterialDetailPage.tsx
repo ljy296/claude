@@ -3,6 +3,7 @@ import {
   getMaterialDetail,
   addMaterialVersion,
   setEffectiveVersion,
+  downloadMaterial,
   type MaterialDetail,
   type MaterialVersion,
   type AuditLog,
@@ -72,6 +73,15 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
     }
   }
 
+  async function handleDownload(versionId?: string) {
+    setError(undefined);
+    try {
+      await downloadMaterial(projectId, materialId, versionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   if (!detail) {
     return (
       <main className="project-detail-page">
@@ -94,7 +104,14 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
             {material.sizeBytes ? ` · ${formatBytes(material.sizeBytes)}` : " · 文件夹/虚拟对象"}
           </p>
         </div>
-        <button onClick={onBack} type="button">返回</button>
+        <div className="row-actions">
+          {material.sizeBytes ? (
+            <button className="primary-upload" onClick={() => void handleDownload()} type="button">
+              下载文件
+            </button>
+          ) : null}
+          <button onClick={onBack} type="button">返回</button>
+        </div>
       </header>
 
       {error ? <p className="error-text">{error}</p> : null}
@@ -135,7 +152,14 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
       {activeTab === "preview" ? (
         <section className="folder-workspace data-panel">
           <h2>预览</h2>
-          {renderPreview(material.name, material.storagePath, material.mimeType)}
+          {renderPreview(material.name, material.mimeType)}
+          {material.sizeBytes ? (
+            <p style={{ marginTop: 12 }}>
+              <button className="primary-upload" onClick={() => void handleDownload()} type="button">
+                下载原文件
+              </button>
+            </p>
+          ) : null}
         </section>
       ) : null}
 
@@ -198,6 +222,7 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
                 version={version}
                 isActive={material.activeVersionId === version.id}
                 onSetEffective={() => void handleSetEffective(version.id)}
+                onDownload={() => void handleDownload(version.id)}
               />
             ))}
           </div>
@@ -233,20 +258,28 @@ export function MaterialDetailPage({ projectId, materialId, onBack }: MaterialDe
   );
 }
 
-function VersionCard({ version, isActive, onSetEffective }: {
+function VersionCard({ version, isActive, onSetEffective, onDownload }: {
   version: MaterialVersion;
   isActive: boolean;
   onSetEffective: () => void;
+  onDownload: () => void;
 }) {
   return (
     <article className={`version-card${isActive ? " active-version" : ""}`}>
       <div className="version-card-head">
         <span className="version-badge">{version.versionTag}</span>
-        {isActive ? <span className="active-badge">当前有效版本</span> : (
-          <button className="set-version-btn" onClick={onSetEffective} type="button">
-            设为有效版本
-          </button>
-        )}
+        <div className="row-actions">
+          {version.sizeBytes ? (
+            <button className="set-version-btn" onClick={onDownload} type="button">
+              下载
+            </button>
+          ) : null}
+          {isActive ? <span className="active-badge">当前有效版本</span> : (
+            <button className="set-version-btn" onClick={onSetEffective} type="button">
+              设为有效版本
+            </button>
+          )}
+        </div>
       </div>
       <p><b>文件名：</b>{version.name}</p>
       <p><b>上传时间：</b>{version.uploadedAt}</p>
@@ -310,18 +343,18 @@ function RelationChainView({ material }: { material: MaterialDetail["material"] 
   );
 }
 
-function renderPreview(name: string, storagePath?: string, mimeType?: string) {
+function renderPreview(name: string, mimeType?: string) {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   if (/pdf/i.test(ext) || mimeType?.includes("pdf")) {
     return (
       <div className="preview-frame">
-        <p className="preview-hint">PDF 文件已存储于服务器本地（{storagePath ? "路径已记录" : "路径未知"}）。在线预览需要集成文件服务器端点。</p>
+        <p className="preview-hint">PDF 文件：在线预览需要集成文件服务器端点，可先下载原文件查看。</p>
         <p>文件名：{name}</p>
       </div>
     );
   }
   if (/png|jpg|jpeg|gif|webp/i.test(ext) || mimeType?.startsWith("image/")) {
-    return <p className="preview-hint">图片预览：文件存储于服务器本地，在线预览需集成文件服务端点后启用。</p>;
+    return <p className="preview-hint">图片预览：在线预览需集成文件服务端点后启用，可先下载原文件查看。</p>;
   }
   if (/md|txt/i.test(ext) || mimeType?.startsWith("text/")) {
     return <p className="preview-hint">文本/Markdown：支持内容预览，需要集成文件读取端点后显示。</p>;

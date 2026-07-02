@@ -1,6 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { getProject, softDeleteProject, type Project, type ProjectFolder } from "./api/client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  fetchMe,
+  getProject,
+  getToken,
+  logout,
+  setUnauthorizedHandler,
+  softDeleteProject,
+  type AuthUser,
+  type Project,
+  type ProjectFolder,
+} from "./api/client";
 import { FolderPage } from "./pages/FolderPage";
+import { LoginPage } from "./pages/LoginPage";
 import { MaterialDetailPage } from "./pages/MaterialDetailPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectListPage } from "./pages/ProjectListPage";
@@ -14,9 +25,44 @@ type Route =
   | { name: "material"; projectId: string; materialId: string }
   | { name: "recycleBin" };
 
+type AuthState =
+  | { status: "checking" }
+  | { status: "authenticated"; user: AuthUser }
+  | { status: "anonymous" };
+
 export function App() {
   const [path, setPath] = useState(window.location.pathname);
   const route = useMemo(() => parseRoute(path), [path]);
+  const [auth, setAuth] = useState<AuthState>({ status: "checking" });
+
+  const handleUnauthorized = useCallback(() => {
+    setAuth({ status: "anonymous" });
+  }, []);
+
+  // 注册全局 401 处理器：任意请求返回 401 时切回登录页
+  useEffect(() => {
+    setUnauthorizedHandler(handleUnauthorized);
+    return () => setUnauthorizedHandler(undefined);
+  }, [handleUnauthorized]);
+
+  // 应用启动时校验会话：有 token 则调用 fetchMe 验证，无则直接进入登录页
+  useEffect(() => {
+    if (!getToken()) {
+      setAuth({ status: "anonymous" });
+      return;
+    }
+    let cancelled = false;
+    void fetchMe()
+      .then((user) => {
+        if (!cancelled) setAuth({ status: "authenticated", user });
+      })
+      .catch(() => {
+        if (!cancelled) setAuth({ status: "anonymous" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const listener = () => setPath(window.location.pathname);
@@ -29,12 +75,33 @@ export function App() {
     setPath(nextPath);
   }
 
+  function handleLogout() {
+    logout();
+    setAuth({ status: "anonymous" });
+    navigate("/");
+  }
+
+  if (auth.status === "checking") {
+    return (
+      <main className="login-page">
+        <p>正在校验登录状态...</p>
+      </main>
+    );
+  }
+
+  if (auth.status === "anonymous") {
+    return <LoginPage onLoggedIn={(user) => setAuth({ status: "authenticated", user })} />;
+  }
+
   return (
     <>
       <nav className="top-nav">
         <span className="nav-brand">结构项目评审平台</span>
         <button onClick={() => navigate("/")} type="button">项目列表</button>
         <button onClick={() => navigate("/recycle-bin")} type="button">回收站</button>
+        <span className="nav-spacer" />
+        <span className="nav-user">{auth.user.displayName}（{auth.user.username}）</span>
+        <button onClick={handleLogout} type="button">退出登录</button>
       </nav>
 
       {route.name === "projects" ? (
