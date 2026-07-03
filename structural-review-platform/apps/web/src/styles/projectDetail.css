@@ -774,11 +774,5 @@
 
 .primary-btn:hover:not(:disabled) { opacity: 0.88; }
 .primary-btn:disabled { cursor: not-allowed; opacity: 0.5; }
-
-.nav-brand {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1e293b;
-  margin-right: auto;
-}
+/* .nav-brand 已由 global.css 统一定义（修复深色文字对比度问题） */
 
