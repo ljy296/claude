@@ -1,3 +1,4 @@
+import "./config/loadEnv"; // 必须最先执行：在 Prisma/config 初始化前加载 .env
 import { createApp } from "./app";
 import { env } from "./config/env";
 import { userStore } from "./services/userStore";
